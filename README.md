@@ -7,6 +7,8 @@
 
 ## Демо
 
+[Открыть демо](https://oleksandr-ivanchenko.github.io/roguelike-phaser/)
+
 [Открыть демо](https://oleksandr-ivanchenko.github.io/mix-roguelike/)
 
 ## Запуск проекта

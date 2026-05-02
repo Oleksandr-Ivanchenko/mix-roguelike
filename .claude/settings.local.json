@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem \"c:\\\\Users\\\\aleks\\\\Projects\\\\roguelike-phaser\" | Where-Object { $_.Name -ne \"node_modules\" } | Format-Table Name, PSIsContainer -AutoSize)"
+    ]
+  }
+}

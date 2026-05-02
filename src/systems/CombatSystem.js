@@ -323,10 +323,16 @@ export class CombatSystem {
 
   s.score += enemy.etype.xp;
   s.enemiesKilled++;
+  s.waveKills = (s.waveKills || 0) + 1;
   s.hud.refreshScore(s.score);
+  s.hud.refreshWave?.(s.waveKills, s.killTarget);
 
   if (s.enemiesKilled % 7 === 0) {
     s.time.delayedCall(500, () => s.enemySystem.spawn("boss"));
+  }
+
+  if (s.waveKills >= s.killTarget) {
+    s._showWaveComplete();
   }
 }
 }

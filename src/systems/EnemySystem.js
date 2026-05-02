@@ -16,16 +16,20 @@ export class EnemySystem {
   _getDiff() {
     const s = this.scene;
     const timeSec = Math.max(0, (s.time.now - s.gameStartTime) / 1000);
-    return 1 + timeSec * 0.015;
+    const waveBonus = 1 + ((s.waveNumber || 1) - 1) * 0.25; // +25% per wave
+    return (1 + timeSec * 0.018) * waveBonus;
   }
 
   _pickType() {
     const s = this.scene;
     const roll = Math.random();
-    if      (s.level >= 7 && roll < 0.05) return "boss";
-    else if (s.level >= 4 && roll < 0.15) return "shooter";
-    else if (s.level >= 3 && roll < 0.25) return "tank";
-    else if (s.level >= 2 && roll < 0.35) return "fast";
+    const wave = s.waveNumber || 1;
+    if      (s.level >= 7  && roll < 0.06) return "boss";
+    else if (s.level >= 5  && roll < 0.12) return "flanker";
+    else if (s.level >= 4  && roll < 0.22) return "shooter";
+    else if (s.level >= 3  && roll < 0.35) return "tank";
+    else if (s.level >= 2  && roll < 0.50) return "fast";
+    else if (wave  >= 2    && roll < 0.60) return "flanker";
     return "basic";
   }
 
@@ -84,8 +88,8 @@ export class EnemySystem {
     if (!etype) return;
 
     let hpMult  = diff;
-    let dmgMult = diff * 0.7;
-    let spdMult = 1 + diff * 0.05;
+    let dmgMult = diff * 0.9;   // damage scales faster
+    let spdMult = 1 + diff * 0.04;
     let tint    = etype.tint;
 
     for (const mKey of mutations) {
@@ -172,20 +176,47 @@ export class EnemySystem {
                 : s.timeWarp ? e.etype.speed * 0.5
                 : e.etype.speed;
 
-      if (e.etype.ranged) {
-        if (dist > 180) {
+      const behavior = e.etype.behavior || "chase";
+
+      if (behavior === "kite" || e.etype.ranged) {
+        // Кайт: держать дистанцию 160–280px, стрелять
+        if (dist > 280) {
           s.physics.moveToObject(e, s.player, spd);
-        } else if (dist < 100) {
+        } else if (dist < 160) {
           const angle = Phaser.Math.Angle.Between(s.player.x, s.player.y, e.x, e.y);
           e.body.setVelocity(Math.cos(angle) * spd, Math.sin(angle) * spd);
         } else {
-          e.body.setVelocity(0, 0);
+          // Двигаться перпендикулярно — уклонение
+          const angle = Phaser.Math.Angle.Between(s.player.x, s.player.y, e.x, e.y);
+          const perp  = angle + (e._perpDir || Math.PI / 2);
+          e.body.setVelocity(Math.cos(perp) * spd * 0.6, Math.sin(perp) * spd * 0.6);
+          if (!e._perpTimer || now > e._perpTimer) {
+            e._perpDir   = (Math.random() > 0.5 ? 1 : -1) * Math.PI / 2;
+            e._perpTimer = now + 1200 + Math.random() * 800;
+          }
         }
         if (now - e.lastShot > e.etype.shootCooldown) {
           e.lastShot = now;
           this.shootFrom(e);
         }
+
+      } else if (behavior === "flank") {
+        // Фланк: подходить под углом 60–90° от прямого направления
+        if (!e._flankAngle || now > e._flankTimer) {
+          const base     = Phaser.Math.Angle.Between(e.x, e.y, s.player.x, s.player.y);
+          const offset   = (Math.random() > 0.5 ? 1 : -1) * (Math.PI / 4 + Math.random() * Math.PI / 4);
+          e._flankAngle  = base + offset;
+          e._flankTimer  = now + 800 + Math.random() * 600;
+        }
+        // Корректируем флэнк-угол если враг уже близко
+        if (dist < 80) {
+          s.physics.moveToObject(e, s.player, spd);
+        } else {
+          e.body.setVelocity(Math.cos(e._flankAngle) * spd, Math.sin(e._flankAngle) * spd);
+        }
+
       } else {
+        // Chase: прямое преследование
         s.physics.moveToObject(e, s.player, spd);
       }
 

@@ -13,11 +13,13 @@ import { WeaponPanel } from "./ui/WeaponPanel.js";
 import { LevelUpMenu } from "./ui/LevelUpMenu.js";
 import { OreShopMenu } from "./ui/OreShopMenu.js";
 import { SkillForgeMenu } from "./ui/SkillForgeMenu.js";
+import { MobileControls } from "./ui/MobileControls.js";
 import { OreDropSystem } from "./systems/OreDropSystem.js";
 import { ResourceSystem } from "./systems/ResourceSystem.js";
 import { CLASSES } from "./config/classes.js";
 import { ORE_KEYS } from "./config/items.js";
 import { SKILL_ASSET_MAP } from "./config/craftedSkills.js";
+import { applyStatCaps } from "./utils/statCaps.js";
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super("GameScene"); }
@@ -124,8 +126,20 @@ export default class GameScene extends Phaser.Scene {
     this.enemiesKilled  = 0;
     this.gold           = 0;
     this.gameStartTime  = 0;
-    this.activeSkills   = new Set(); // id взятых навыков
-    this.activeSynergies = new Set(); // id сработавших синергий
+    this.activeSkills   = new Set();
+    this.activeSynergies = new Set();
+
+    // ── WAVE SYSTEM ────────────────────────
+    this.waveNumber    = this.registry.get("waveNumber") || 1;
+    this.waveKills     = 0;
+    this.killTarget    = 1000;
+    this._waveComplete = false;
+
+    // ── LUCK ───────────────────────────────
+    this.luck = 0;
+
+    // ── DEBUG ──────────────────────────────
+    this._lastDebugLog = 0;
 
     // ── MAP ────────────────────────────────
     this.wallGroup = this.physics.add.staticGroup();
@@ -219,9 +233,11 @@ export default class GameScene extends Phaser.Scene {
     this.levelUpMenu = new LevelUpMenu(this);
     this.oreShopMenu    = new OreShopMenu(this);
     this.skillForgeMenu = new SkillForgeMenu(this);
+    this.mobileControls = new MobileControls(this);
     this.levelUpOpen    = false;
 
     this.hud.build();
+    this.mobileControls.build();
     this.gameStartTime = this.time.now;
 
     // ── INPUT ──────────────────────────────
@@ -393,8 +409,10 @@ export default class GameScene extends Phaser.Scene {
     const R  = this.cursors.right.isDown || this.wasd.right.isDown;
     const U  = this.cursors.up.isDown    || this.wasd.up.isDown;
     const D  = this.cursors.down.isDown  || this.wasd.down.isDown;
-    const vx = (R ? 1 : L ? -1 : 0) * 520;
-    const vy = (D ? 1 : U ? -1 : 0) * 520;
+    const jdx = this.mobileControls?.dx ?? 0;
+    const jdy = this.mobileControls?.dy ?? 0;
+    const vx = (R ? 1 : L ? -1 : (Math.abs(jdx) > 0.2 ? Math.sign(jdx) : 0)) * 520;
+    const vy = (D ? 1 : U ? -1 : (Math.abs(jdy) > 0.2 ? Math.sign(jdy) : 0)) * 520;
     if (vx === 0 && vy === 0) return;
 
     this.isDashing = true;
@@ -423,7 +441,9 @@ export default class GameScene extends Phaser.Scene {
     const R = this.cursors.right.isDown || this.wasd.right.isDown;
     const U = this.cursors.up.isDown    || this.wasd.up.isDown;
     const D = this.cursors.down.isDown  || this.wasd.down.isDown;
-    const isMoving = L || R || U || D;
+    const jdx = this.mobileControls?.dx ?? 0;
+    const jdy = this.mobileControls?.dy ?? 0;
+    const isMoving = L || R || U || D || Math.hypot(jdx, jdy) > 0.1;
 
     this.isSprinting = this._shiftKey?.isDown && isMoving && !this.isExhausted;
     this.isBlocking  = cls === "warrior" && this._ctrlKey?.isDown && !this.isExhausted;
@@ -436,10 +456,10 @@ export default class GameScene extends Phaser.Scene {
     const effectiveSpeed = this.moveSpeed * sprintMult * exhaustMult;
 
     if (!this.isDashing) {
-      if (L) body.setVelocityX(-effectiveSpeed);
-      if (R) body.setVelocityX(effectiveSpeed);
-      if (U) body.setVelocityY(-effectiveSpeed);
-      if (D) body.setVelocityY(effectiveSpeed);
+      const vx = L ? -effectiveSpeed : R ? effectiveSpeed : jdx * effectiveSpeed;
+      const vy = U ? -effectiveSpeed : D ? effectiveSpeed : jdy * effectiveSpeed;
+      if (vx !== 0) body.setVelocityX(vx);
+      if (vy !== 0) body.setVelocityY(vy);
     }
 
     // ── Авто-атака: только если враг в радиусе оружия ───────────────────────
@@ -496,8 +516,156 @@ export default class GameScene extends Phaser.Scene {
       this.hud.refreshSkillSlots(this.activeSkillSlots, this.skillCooldowns, now);
     }
 
+    // ── Stat caps (every frame, cheap clamp) ─
+    applyStatCaps(this);
+
+    // ── Debug лог каждые 10 сек ───────────
+    if (now - this._lastDebugLog >= 10000) {
+      this._lastDebugLog = now;
+      console.log(
+        `[DEBUG] Ур.${this.level} | Урон×${this.damageMult.toFixed(2)} | ` +
+        `КД×${this.cooldownMult.toFixed(2)} | Крит:${(this.critChance*100).toFixed(0)}% ` +
+        `×${this.critMult.toFixed(1)} | Броня:${this.armor}% | ` +
+        `Вамп:${this.lifesteal} | ХПреген:${this.hpRegen}/с | ` +
+        `Удача:${this.luck} | Волна:${this.waveNumber} [${this.waveKills}/${this.killTarget}]`
+      );
+    }
+
     // ── Системы ───────────────────────────
     this.enemySystem.update(now);
     this.orbSystem.update();
   }
+
+  _showWaveComplete() {
+    if (this._waveComplete) return;
+    this._waveComplete = true;
+    this.physics.pause();
+
+    const W = this.cameras.main.width;
+    const H = this.cameras.main.height;
+    const elapsed = Math.floor((this.time.now - this.gameStartTime) / 1000);
+    const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
+    const ss = String(elapsed % 60).padStart(2, "0");
+
+    this.add.rectangle(W / 2, H / 2, 500, 320, 0x000000, 0.96)
+      .setScrollFactor(0).setDepth(50).setStrokeStyle(2, 0xffdd44);
+
+    this.add.text(W / 2, H / 2 - 120, `ВОЛНА ${this.waveNumber} ПРОЙДЕНА!`, {
+      fontSize: "30px", color: "#ffdd44", fontFamily: "monospace", fontStyle: "bold"
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(51);
+
+    this.add.text(W / 2, H / 2 - 80,
+      `Убийств: ${this.enemiesKilled}   Ур: ${this.level}   Очки: ${this.score}   ${mm}:${ss}`, {
+      fontSize: "13px", color: "#aaaaaa", fontFamily: "monospace"
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(51);
+
+    this.add.text(W / 2, H / 2 - 50, "Введи имя для таблицы рекордов:", {
+      fontSize: "12px", color: "#88aacc", fontFamily: "monospace"
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(51);
+
+    // HTML input overlay
+    const canvas = this.sys.game.canvas;
+    const rect   = canvas.getBoundingClientRect();
+    const scaleX = rect.width  / W;
+    const scaleY = rect.height / H;
+
+    const wrapper = document.createElement("div");
+    Object.assign(wrapper.style, {
+      position: "fixed",
+      left:   `${rect.left + (W / 2 - 120) * scaleX}px`,
+      top:    `${rect.top  + (H / 2 - 28)  * scaleY}px`,
+      width:  `${240 * scaleX}px`,
+      height: `${32  * scaleY}px`,
+      zIndex: "9999",
+      display: "flex",
+      gap: "6px",
+    });
+
+    const inp = document.createElement("input");
+    Object.assign(inp.style, {
+      flex: "1",
+      background: "#0d1a2e",
+      border: "1px solid #4455aa",
+      color: "#ffffff",
+      fontFamily: "monospace",
+      fontSize: `${13 * scaleY}px`,
+      padding: "0 6px",
+      outline: "none",
+    });
+    inp.maxLength = 20;
+    inp.placeholder = "Игрок";
+
+    const okBtn = document.createElement("button");
+    okBtn.textContent = "OK";
+    Object.assign(okBtn.style, {
+      background: "#224488",
+      border: "1px solid #5566cc",
+      color: "#aabbff",
+      fontFamily: "monospace",
+      fontSize: `${12 * scaleY}px`,
+      padding: "0 8px",
+      cursor: "pointer",
+    });
+
+    wrapper.appendChild(inp);
+    wrapper.appendChild(okBtn);
+    document.body.appendChild(wrapper);
+
+    const confirm = () => {
+      const name = inp.value.trim() || "Игрок";
+      document.body.removeChild(wrapper);
+      saveLeaderboardEntry({
+        name, wave: this.waveNumber, level: this.level,
+        kills: this.enemiesKilled, time: `${mm}:${ss}`,
+        score: this.score, cls: this.playerClass?.name || "?"
+      });
+      this._buildWaveButtons(W, H);
+    };
+
+    okBtn.addEventListener("click", confirm);
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") confirm(); });
+
+    // Focus after short delay so Phaser doesn't immediately swallow the event
+    this.time.delayedCall(80, () => inp.focus());
+  }
+
+  _buildWaveButtons(W, H) {
+    // Следующая волна
+    const nb = this.add.rectangle(W / 2, H / 2 + 26, 260, 46, 0x226622)
+      .setScrollFactor(0).setDepth(51).setStrokeStyle(2, 0x44ff44)
+      .setInteractive({ useHandCursor: true });
+    this.add.text(W / 2, H / 2 + 26, `ВОЛНА ${this.waveNumber + 1} →`, {
+      fontSize: "18px", color: "#aaffaa", fontFamily: "monospace", fontStyle: "bold"
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(52);
+    nb.on("pointerover", () => nb.setFillStyle(0x338833));
+    nb.on("pointerout",  () => nb.setFillStyle(0x226622));
+    nb.on("pointerdown", () => {
+      this.registry.set("waveNumber", this.waveNumber + 1);
+      this.scene.restart();
+    });
+
+    // В меню
+    const mb = this.add.rectangle(W / 2, H / 2 + 84, 260, 46, 0x222266)
+      .setScrollFactor(0).setDepth(51).setStrokeStyle(2, 0x5555ff)
+      .setInteractive({ useHandCursor: true });
+    this.add.text(W / 2, H / 2 + 84, "В ГЛАВНОЕ МЕНЮ", {
+      fontSize: "16px", color: "#aaaaff", fontFamily: "monospace", fontStyle: "bold"
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(52);
+    mb.on("pointerover", () => mb.setFillStyle(0x3333aa));
+    mb.on("pointerout",  () => mb.setFillStyle(0x222266));
+    mb.on("pointerdown", () => this.scene.start("MainMenuScene"));
+  }
+}
+
+// ── Leaderboard helpers ───────────────────────────────────────────────────────
+export function saveLeaderboardEntry(entry) {
+  const key = "roguelike_leaderboard";
+  const board = JSON.parse(localStorage.getItem(key) || "[]");
+  board.push({ ...entry, date: new Date().toLocaleDateString("ru") });
+  board.sort((a, b) => (b.wave * 10000 + b.score) - (a.wave * 10000 + a.score));
+  localStorage.setItem(key, JSON.stringify(board.slice(0, 10)));
+}
+
+export function getLeaderboard() {
+  return JSON.parse(localStorage.getItem("roguelike_leaderboard") || "[]");
 }

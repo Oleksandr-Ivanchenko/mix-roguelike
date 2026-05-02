@@ -1,3 +1,3 @@
 export function xpForLevel(lvl) {
-  return 10 + lvl * lvl * 2;
+  return 40 + lvl * lvl * 8; // 4x slower progression
 }

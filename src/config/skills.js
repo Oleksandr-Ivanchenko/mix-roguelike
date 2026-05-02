@@ -7,6 +7,10 @@ export const RARITY = {
 
 // class: "warrior" | "archer" | "both" (undefined = both)
 export const SKILL_POOL = [
+  // ═══ УДАЧА ═════════════════════════════════════════════════════════════════
+  { id: "luck1", rarity: "rare", icon: "🍀", label: "+1 Удача (лучшие скиллы)", apply: s => { s.luck = (s.luck || 0) + 1; } },
+  { id: "luck2", rarity: "epic", unique: true, icon: "🍀", label: "+3 Удача (намного лучше скиллы)", apply: s => { s.luck = (s.luck || 0) + 3; } },
+
   // ═══ COMMON — оба класса ═══════════════════════════════════════════════════
   { id: "dmg_up",       rarity: "common",  icon: "⚔️",  label: "+20% урон",              apply: s => { s.damageMult += 0.20; } },
   { id: "dmg_up2",      rarity: "common",  icon: "⚔️",  label: "+25% урон",              apply: s => { s.damageMult += 0.25; } },

@@ -27,7 +27,7 @@ export class ProgressionSystem {
     s.statPoints = (s.statPoints || 0) + 1;
     s.hud?.refreshStatPoints?.(s.statPoints);
 
-    const choices = this._pickSkills(4);
+    const choices = this._pickSkills(3);
     s.levelUpMenu.show(s.level, choices, (skill) => {
       skill.apply(s);
       s.activeSkills.add(skill.id);
@@ -50,6 +50,13 @@ export class ProgressionSystem {
       if (sk.class && sk.class !== cls) return false;
       return true;
     });
+    // Luck reduces level requirement for epics/legendaries
+    if ((s.luck || 0) >= 3 && s.level >= 2) {
+      available.push(...SKILL_POOL.filter(sk =>
+        sk.rarity === "epic" && !s.activeSkills.has(sk.id) &&
+        (!sk.class || sk.class === cls) && !available.includes(sk)
+      ));
+    }
 
     const result = [];
     const used   = new Set();
@@ -66,10 +73,13 @@ export class ProgressionSystem {
   }
 
   _weightedPick(pool) {
-    const total = pool.reduce((sum, sk) => sum + (RARITY[sk.rarity]?.weight ?? 60), 0);
+    const luck = this.scene.luck || 0;
+    const luckMult = { common: 1, rare: 1 + luck * 0.2, epic: 1 + luck * 0.4, legendary: 1 + luck * 0.8 };
+    const weight = sk => (RARITY[sk.rarity]?.weight ?? 60) * (luckMult[sk.rarity] || 1);
+    const total = pool.reduce((sum, sk) => sum + weight(sk), 0);
     let r = Math.random() * total;
     for (const sk of pool) {
-      r -= RARITY[sk.rarity]?.weight ?? 60;
+      r -= weight(sk);
       if (r <= 0) return sk;
     }
     return pool[pool.length - 1];

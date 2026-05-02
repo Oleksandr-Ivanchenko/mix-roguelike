@@ -73,10 +73,13 @@ export class HUD {
       fontSize: "11px", color: "#ffdd44", fontFamily: "monospace", fontStyle: "bold"
     }).setScrollFactor(0).setDepth(22);
 
-    // ── Timer (top center) ───────────────────────────────────────────────────
-    s.add.rectangle(W / 2, 8, 110, 28, 0x000000, 0.65).setScrollFactor(0).setDepth(20).setOrigin(0.5, 0);
-    this._timerTxt = s.add.text(W / 2, 12, "00:00", {
+    // ── Timer + wave counter (top center) ───────────────────────────────────
+    s.add.rectangle(W / 2, 8, 200, 40, 0x000000, 0.65).setScrollFactor(0).setDepth(20).setOrigin(0.5, 0);
+    this._timerTxt = s.add.text(W / 2, 10, "00:00", {
       fontSize: "18px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold"
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(22);
+    this._waveTxt = s.add.text(W / 2, 30, "0 / 1000", {
+      fontSize: "10px", color: "#888888", fontFamily: "monospace"
     }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(22);
 
     // ── Ore panel (top right) ────────────────────────────────────────────────
@@ -129,6 +132,10 @@ export class HUD {
   }
 
   refreshScore(score) { this._scoreTxt.setText("Очки: " + score); }
+  refreshWave(kills, target) {
+    const waveNum = this.scene.waveNumber || 1;
+    this._waveTxt?.setText(`Волна ${waveNum}: ${kills} / ${target}`);
+  }
   refreshGold(gold)   { this._goldTxt.setText(`⬡ ${gold}`); }
 
   refreshTimer(seconds) {

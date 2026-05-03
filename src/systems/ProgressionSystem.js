@@ -42,7 +42,13 @@ export class ProgressionSystem {
   _pickSkills(count) {
     const s = this.scene;
 
-    const cls = s.playerClass?.id ?? null;
+    // Map new classes to the nearest skill category
+    const SKILL_CATEGORY = {
+      warrior: "warrior", rogue: "warrior", paladin: "warrior",
+      archer: "archer",   mage: "archer",   necromancer: "archer",
+      summoner: "archer", hunter: "archer",
+    };
+    const cls = SKILL_CATEGORY[s.playerClass?.id] ?? null;
     const available = SKILL_POOL.filter(sk => {
       if (sk.unique && s.activeSkills.has(sk.id)) return false;
       if (sk.rarity === "epic"      && s.level < 4) return false;
@@ -123,7 +129,7 @@ export class ProgressionSystem {
   _upgradeWave() {
     const s        = this.scene;
     s.wave         = s.level;
-    const newDelay = Math.max(800, 2500 - s.level * 120);
+    const newDelay = Math.max(1000, 3200 - s.level * 130);
     if (newDelay !== s.spawnTimer.delay) {
       s.spawnTimer.remove();
       s.spawnTimer = s.time.addEvent({

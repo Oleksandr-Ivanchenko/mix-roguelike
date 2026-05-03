@@ -15,21 +15,33 @@ export class EnemySystem {
 
   _getDiff() {
     const s = this.scene;
-    const timeSec = Math.max(0, (s.time.now - s.gameStartTime) / 1000);
-    const waveBonus = 1 + ((s.waveNumber || 1) - 1) * 0.25; // +25% per wave
-    return (1 + timeSec * 0.018) * waveBonus;
+    const timeSec   = Math.max(0, (s.time.now - s.gameStartTime) / 1000);
+    const waveBonus = 1 + ((s.waveNumber || 1) - 1) * 0.22;
+
+    // Gentle early ramp (caps at +50% after ~2.5min), then hard ramp after 5 min
+    const earlyRamp = Math.min(timeSec * 0.003, 0.5);
+    const lateRamp  = Math.max(0, timeSec - 300) * 0.013;
+    return (1 + earlyRamp + lateRamp) * waveBonus;
   }
 
   _pickType() {
-    const s = this.scene;
+    const s    = this.scene;
     const roll = Math.random();
     const wave = s.waveNumber || 1;
-    if      (s.level >= 7  && roll < 0.06) return "boss";
-    else if (s.level >= 5  && roll < 0.12) return "flanker";
-    else if (s.level >= 4  && roll < 0.22) return "shooter";
-    else if (s.level >= 3  && roll < 0.35) return "tank";
-    else if (s.level >= 2  && roll < 0.50) return "fast";
-    else if (wave  >= 2    && roll < 0.60) return "flanker";
+    const t    = Math.max(0, (s.time.now - s.gameStartTime) / 1000);
+
+    // Time gates: harder enemies only after enough time has passed
+    if (s.level >= 8  && t >= 420 && roll < 0.05) return "boss";
+    if (s.level >= 7  && t >= 360 && roll < 0.10) return "abomination";
+    if (s.level >= 6  && t >= 270 && roll < 0.16) return "harvester";
+    if (s.level >= 5  && t >= 210 && roll < 0.23) return "knight";
+    if (s.level >= 5  && t >= 180 && roll < 0.30) return "flanker";
+    if (s.level >= 4  && t >= 150 && roll < 0.38) return "shooter";
+    if (s.level >= 4  && t >= 150 && roll < 0.46) return "sentinel";
+    if (s.level >= 3  && t >= 120 && roll < 0.55) return "tank";
+    if (s.level >= 3  && t >=  90 && roll < 0.63) return "marauder";
+    if (s.level >= 2  &&             roll < 0.74) return "fast";
+    if (wave  >= 2    &&             roll < 0.82) return "flanker";
     return "basic";
   }
 

@@ -16,15 +16,15 @@ export class DifficultySystem {
     const wave = this.getWave(timeSec);
     if (wave === this.lastWave) return;
     this.lastWave = wave;
-    if (wave === 0) return;
+    if (wave < 2) return; // no events in first 2 minutes
 
-    if (wave % 5 === 0) {
+    if (wave >= 8 && wave % 8 === 0) {
       this.scene.enemySystem.spawnMiniBoss();
-      this._notify(`☠ МИНИ-БОСС — Волна ${wave}!`, "#ff2244", 0x330000, 0xff2244);
-    } else if (wave % 3 === 0) {
+      this._notify(`☠ МИНИ-БОСС!`, "#ff2244", 0x330000, 0xff2244);
+    } else if (wave >= 5 && wave % 5 === 0) {
       this.scene.enemySystem.spawnEliteWave();
-      this._notify(`★ ЭЛИТНАЯ ВОЛНА ${wave}`, "#ffdd00", 0x1a1400, 0x996600);
-    } else {
+      this._notify(`★ ЭЛИТНАЯ ВОЛНА`, "#ffdd00", 0x1a1400, 0x996600);
+    } else if (wave >= 3) {
       this._notify(`🌊 Волна ${wave}`, "#66aaff", 0x00001a, 0x224488);
     }
   }

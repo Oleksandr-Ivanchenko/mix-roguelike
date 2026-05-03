@@ -45,30 +45,43 @@ export class EnemySystem {
     return "basic";
   }
 
-  _edgePos() {
-    const s = this.scene;
-    const side = Phaser.Math.Between(0, 3);
-    let ex, ey;
-    switch (side) {
-      case 0: ex = Phaser.Math.Between(1, s.mapW - 2); ey = 1;           break;
-      case 1: ex = Phaser.Math.Between(1, s.mapW - 2); ey = s.mapH - 2; break;
-      case 2: ex = 1;           ey = Phaser.Math.Between(1, s.mapH - 2); break;
-      default: ex = s.mapW - 2; ey = Phaser.Math.Between(1, s.mapH - 2); break;
+  _spawnPos() {
+    const s  = this.scene;
+    const px = s.player?.x ?? 0, py = s.player?.y ?? 0;
+
+    // Pass 1: open floor tile (no wall neighbors) far from player
+    for (let tries = 0; tries < 80; tries++) {
+      const ex = 1 + Math.floor(Math.random() * (s.mapW - 2));
+      const ey = 1 + Math.floor(Math.random() * (s.mapH - 2));
+      if (s.map[ey]?.[ex] !== 1) continue;
+      const hasWallNeighbor =
+        s.map[ey - 1]?.[ex] === 0 || s.map[ey + 1]?.[ex] === 0 ||
+        s.map[ey]?.[ex - 1] === 0 || s.map[ey]?.[ex + 1] === 0;
+      if (hasWallNeighbor) continue;
+      const wx = ex * s.T + s.T / 2, wy = ey * s.T + s.T / 2;
+      if (Phaser.Math.Distance.Between(wx, wy, px, py) < 180) continue;
+      return { ex, ey };
     }
-    return { ex, ey };
+
+    // Pass 2: any floor tile far from player
+    for (let tries = 0; tries < 120; tries++) {
+      const ex = 1 + Math.floor(Math.random() * (s.mapW - 2));
+      const ey = 1 + Math.floor(Math.random() * (s.mapH - 2));
+      if (s.map[ey]?.[ex] !== 1) continue;
+      const wx = ex * s.T + s.T / 2, wy = ey * s.T + s.T / 2;
+      if (Phaser.Math.Distance.Between(wx, wy, px, py) < 180) continue;
+      return { ex, ey };
+    }
+
+    return null;
   }
 
   spawn(forceType) {
     const s    = this.scene;
     const diff = this._getDiff();
-    const { ex, ey } = this._edgePos();
-
-    if (s.map[ey][ex] === 0) return;
-    if (s.player && Phaser.Math.Distance.Between(
-      ex * s.T + s.T / 2, ey * s.T + s.T / 2,
-      s.player.x, s.player.y) < 180) return;
-
-    this._createEnemy(ex, ey, forceType || this._pickType(), [], diff);
+    const pos  = this._spawnPos();
+    if (!pos) return;
+    this._createEnemy(pos.ex, pos.ey, forceType || this._pickType(), [], diff);
   }
 
   spawnEliteWave() {
@@ -76,10 +89,8 @@ export class EnemySystem {
     const diff = this._getDiff();
     const count = 6 + Math.floor(diff * 0.5);
     for (let i = 0; i < count; i++) {
-      const { ex, ey } = this._edgePos();
-      if (s.map[ey]?.[ex] !== 0) {
-        this._createEnemy(ex, ey, this._pickType(), ["elite"], diff);
-      }
+      const pos = this._spawnPos();
+      if (pos) this._createEnemy(pos.ex, pos.ey, this._pickType(), ["elite"], diff);
     }
   }
 
@@ -88,10 +99,8 @@ export class EnemySystem {
     const diff = this._getDiff();
     const roll  = Math.random();
     const mutations = roll < 0.5 ? ["elite", "armored"] : ["elite", "speedy"];
-    const { ex, ey } = this._edgePos();
-    if (s.map[ey]?.[ex] !== 0) {
-      this._createEnemy(ex, ey, "boss", mutations, diff);
-    }
+    const pos = this._spawnPos();
+    if (pos) this._createEnemy(pos.ex, pos.ey, "boss", mutations, diff);
   }
 
   _createEnemy(ex, ey, typeName, mutations, diff) {

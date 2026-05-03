@@ -484,16 +484,26 @@ export class CombatSystem {
 
   s.score += enemy.etype.xp;
   s.enemiesKilled++;
-  s.waveKills = (s.waveKills || 0) + 1;
   s.hud.refreshScore(s.score);
-  s.hud.refreshWave?.(s.waveKills, s.killTarget);
 
-  if (s.enemiesKilled % 7 === 0) {
-    s.time.delayedCall(500, () => s.enemySystem.spawn("boss"));
+  // Wave boss kill → end wave
+  if (enemy._isWaveBoss) {
+    s.sfx?.startMusic(Math.random() < 0.5 ? "music_normal1" : "music_normal2");
+    s.time.delayedCall(1200, () => s._showWaveComplete());
+    return;
   }
 
-  if (s.waveKills >= s.killTarget) {
-    s._showWaveComplete();
+  s.waveKills = (s.waveKills || 0) + 1;
+  s.hud.refreshWave?.(s.waveKills, s.killTarget);
+
+  // At 95 kills → spawn wave boss (stop regular spawning)
+  if (s.waveKills >= s.killTarget && !s._waveBossSpawned) {
+    s._waveBossSpawned = true;
+    s.sfx?.startMusic("music_boss");
+    s.time.delayedCall(1500, () => {
+      s.enemySystem.spawnWaveBoss();
+      s.difficultySystem?._notify("☠ ВОЛНОВОЙ БОСС!", "#ffaa00", 0x1a0800, 0xcc6600);
+    });
   }
 }
 }

@@ -120,6 +120,63 @@ export class HUD {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(22);
   }
 
+  buildSoundControl(sfx) {
+    const s   = this.scene;
+    const W   = s.cameras.main.width;
+    const H   = s.cameras.main.height;
+    const dep = 25;
+    const sf  = 0;
+
+    const bar = v => "█".repeat(Math.round(Math.min(1, Math.max(0, v)) * 8)).padEnd(8, "░");
+
+    // Panel: bottom-right, above hints
+    const panCX = W - 118, panCY = H - 38;
+    s.add.rectangle(panCX, panCY, 220, 40, 0x060812, 0.90)
+      .setStrokeStyle(1, 0x1e2d4a).setScrollFactor(sf).setDepth(dep - 1).setOrigin(0.5);
+
+    const row = (label, ry, getVol, setVol, isMuted, toggleMute) => {
+      s.add.text(W - 228, ry, label, {
+        fontSize: "9px", color: "#556677", fontFamily: "monospace"
+      }).setOrigin(0, 0.5).setScrollFactor(sf).setDepth(dep);
+
+      const barTxt = s.add.text(W - 198, ry, bar(getVol()), {
+        fontSize: "9px", color: isMuted() ? "#1e2233" : "#3a5799", fontFamily: "monospace"
+      }).setOrigin(0, 0.5).setScrollFactor(sf).setDepth(dep);
+
+      const muteBtn = s.add.text(W - 22, ry, "[M]", {
+        fontSize: "9px", color: isMuted() ? "#cc3333" : "#334455", fontFamily: "monospace"
+      }).setOrigin(0.5).setScrollFactor(sf).setDepth(dep)
+        .setInteractive({ useHandCursor: true })
+        .on("pointerdown", () => {
+          toggleMute();
+          barTxt.setColor(isMuted() ? "#1e2233" : "#3a5799");
+          muteBtn.setColor(isMuted() ? "#cc3333" : "#334455");
+        });
+
+      const mkBtn = (x, lbl, onClick) => {
+        const t = s.add.text(x, ry, lbl, {
+          fontSize: "11px", color: "#445566", fontFamily: "monospace"
+        }).setOrigin(0.5).setScrollFactor(sf).setDepth(dep)
+          .setInteractive({ useHandCursor: true })
+          .on("pointerover",  () => t.setColor("#aaccdd"))
+          .on("pointerout",   () => t.setColor("#445566"))
+          .on("pointerdown", onClick);
+        return t;
+      };
+
+      mkBtn(W - 87, "−", () => { setVol(getVol() - 0.1); barTxt.setText(bar(getVol())); });
+      mkBtn(W - 50, "+", () => { setVol(getVol() + 0.1); barTxt.setText(bar(getVol())); });
+    };
+
+    row("MUS", panCY - 9,
+      () => sfx.musicVolume, v => sfx.setMusicVolume(v),
+      () => sfx.musicMuted,      () => sfx.toggleMusicMute());
+
+    row("SFX", panCY + 9,
+      () => sfx.sfxVolume,  v => sfx.setSfxVolume(v),
+      () => sfx.sfxMuted,       () => sfx.toggleSfxMute());
+  }
+
   refreshHP(hp, maxHp) {
     this._hpFill.displayWidth = 180 * Math.max(0, hp / maxHp);
     this._hpTxt.setText(`HP ${Math.ceil(hp)}/${maxHp}`);

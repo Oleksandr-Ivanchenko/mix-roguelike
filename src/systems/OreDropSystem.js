@@ -8,18 +8,24 @@ export class OreDropSystem {
 
   drop(enemy) {
     const s       = this.scene;
-    const context = enemy.etype?.isBoss      ? "boss"
-                  : enemy.mutations?.has("elite") ? "elite"
-                  : "normal";
+    const isBoss  = enemy._isWaveBoss || enemy.etype?.isBoss;
+    const isElite = enemy.mutations?.has("elite");
+    const context = isBoss ? "boss" : isElite ? "elite" : "normal";
 
     const items = this.lootSystem.rollLoot(context);
-    const ex = enemy.x;
-    const ey = enemy.y;
+    const ex = enemy.x, ey = enemy.y;
 
     items.forEach((item, i) => {
       const offset = (i - (items.length - 1) / 2) * 22;
       this._spawnItem(item, ex + offset, ey);
     });
+
+    // Health potion drop chance
+    const potionChance = isBoss ? 0.60 : isElite ? 0.18 : 0.05;
+    if (Math.random() < potionChance) {
+      const healAmount = Math.max(20, Math.floor((s.playerMaxHP ?? 100) * 0.22));
+      this._spawnItem({ type: "heal", key: "potion_hp", value: healAmount }, ex, ey - 20);
+    }
   }
 
   _spawnItem(item, x, y) {

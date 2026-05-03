@@ -21,6 +21,8 @@ import { ORE_KEYS } from "./config/items.js";
 import { SKILL_ASSET_MAP } from "./config/craftedSkills.js";
 import { applyStatCaps } from "./utils/statCaps.js";
 import { SoundSystem } from "./systems/SoundSystem.js";
+import { WeaponUpgradeMenu } from "./ui/WeaponUpgradeMenu.js";
+import { WEAPON_UPGRADES, CLASS_UPGRADE_TRACK } from "./config/weaponUpgrades.js";
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super("GameScene"); }
@@ -29,6 +31,7 @@ export default class GameScene extends Phaser.Scene {
     // ── Terrain ────────────────────────────────────────────────────────────────
     this.load.image("wall",  "assets/wall.png");
     this.load.image("floor", "assets/floor.png");
+    this.load.image("door",  "assets/door.png");
 
     // ── Heroes ─────────────────────────────────────────────────────────────────
     this.load.image("player",          "assets/player.png");
@@ -73,6 +76,13 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("bullet", "assets/skills/bullet.png");
 
     ORE_KEYS.forEach(key => this.load.image(key, `assets/Coins/${key}.png`));
+
+    // ── Weapon upgrade tiers ───────────────────────────────────────────────────
+    [["wup_blow1","blow1"],["wup_blow2","blow2"],["wup_blow3","blow3"],["wup_blow4","blow4"],
+     ["wup_blowgold","blowgold"],["wup_blowepic","blowepic"],["wup_blowLegend","blowLegend"],
+     ["wup_sworld","sworld"],["wup_sworld1","sworld1"],["wup_sworld2","sworld2"],
+     ["wup_sworld3","sworld3"],["wup_sworldEpic","sworldEpic"],["wup_sworldLegend","sworldLegend"],
+    ].forEach(([key, file]) => this.load.image(key, `assets/weapon/${file}.png`));
     SKILL_ASSET_MAP.forEach(([key, path]) => this.load.image(key, path));
 
     // ── Audio ──────────────────────────────────────────────────────────────────
@@ -292,6 +302,23 @@ export default class GameScene extends Phaser.Scene {
     this.hud.build();
     this.mobileControls.build();
     this.sfx = new SoundSystem(this);
+    this.weaponUpgradeMenu = new WeaponUpgradeMenu(this);
+
+    // ── Restore weapon tier across waves ──────────────────────────────────────
+    this.weaponTier = this.registry.get("weaponTier") || 0;
+    if (this.weaponTier > 0) {
+      const track = WEAPON_UPGRADES[CLASS_UPGRADE_TRACK[cls.id] ?? "archer"];
+      const t = track[this.weaponTier];
+      if (t) {
+        this.damageMult   += t.totalDmg   ?? 0;
+        this.cooldownMult *= t.totalCdFact ?? 1;
+        // Swap weapon icon to current tier
+        this.time.delayedCall(50, () => {
+          if (this._weaponSprite?.active) this._weaponSprite.setTexture(t.iconKey);
+        });
+      }
+    }
+
     this.gameStartTime = this.time.now;
 
     // ── Pause when window loses focus ──────────────────────────────────────────
@@ -727,7 +754,7 @@ export default class GameScene extends Phaser.Scene {
 
   _buildWaveButtons(W, H) {
     // Следующая волна
-    const nb = this.add.rectangle(W / 2, H / 2 + 26, 260, 46, 0x226622)
+    const nb = this.add.rectangle(W / 2, H / 2 + 26, 260, 44, 0x226622)
       .setScrollFactor(0).setDepth(51).setStrokeStyle(2, 0x44ff44)
       .setInteractive({ useHandCursor: true });
     this.add.text(W / 2, H / 2 + 26, `ВОЛНА ${this.waveNumber + 1} →`, {
@@ -740,11 +767,22 @@ export default class GameScene extends Phaser.Scene {
       this.scene.restart();
     });
 
+    // Улучшить оружие
+    const ub = this.add.rectangle(W / 2, H / 2 + 78, 260, 44, 0x1a1a3a)
+      .setScrollFactor(0).setDepth(51).setStrokeStyle(2, 0x5566ff)
+      .setInteractive({ useHandCursor: true });
+    this.add.text(W / 2, H / 2 + 78, "⚔️  УЛУЧШИТЬ ОРУЖИЕ", {
+      fontSize: "16px", color: "#8899ff", fontFamily: "monospace", fontStyle: "bold"
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(52);
+    ub.on("pointerover", () => ub.setFillStyle(0x252550));
+    ub.on("pointerout",  () => ub.setFillStyle(0x1a1a3a));
+    ub.on("pointerdown", () => this.weaponUpgradeMenu.show());
+
     // В меню
-    const mb = this.add.rectangle(W / 2, H / 2 + 84, 260, 46, 0x222266)
+    const mb = this.add.rectangle(W / 2, H / 2 + 130, 260, 44, 0x222266)
       .setScrollFactor(0).setDepth(51).setStrokeStyle(2, 0x5555ff)
       .setInteractive({ useHandCursor: true });
-    this.add.text(W / 2, H / 2 + 84, "В ГЛАВНОЕ МЕНЮ", {
+    this.add.text(W / 2, H / 2 + 130, "В ГЛАВНОЕ МЕНЮ", {
       fontSize: "16px", color: "#aaaaff", fontFamily: "monospace", fontStyle: "bold"
     }).setOrigin(0.5).setScrollFactor(0).setDepth(52);
     mb.on("pointerover", () => mb.setFillStyle(0x3333aa));

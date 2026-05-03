@@ -83,7 +83,7 @@ export default class MainMenuScene extends Phaser.Scene {
 
     this.add.text(W / 2, H - 18,
       "WASD движение  |  Space уклон  |  Shift спринт  |  E магазин  |  TAB кузница  |  Q/F навыки", {
-      fontSize: "10px", color: "#ff0000", fontFamily: "monospace"
+      fontSize: "10px", color: "#333344", fontFamily: "monospace"
     }).setOrigin(0.5);
   }
 

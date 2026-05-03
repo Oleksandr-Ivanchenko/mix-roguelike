@@ -23,13 +23,16 @@ export class OreDropSystem {
   }
 
   _spawnItem(item, x, y) {
-    const s      = this.scene;
-    const sprite = s.physics.add.sprite(x, y, item.key).setDisplaySize(16, 16).setDepth(1.5);
+    const s    = this.scene;
+    s.sfx?.playDrop();
+    const size = item.type === "currency" ? 8 : 16;
+    const sprite = s.physics.add.sprite(x, y, item.key).setDisplaySize(size, size).setDepth(1.5);
     sprite.body.setAllowGravity(false);
     sprite.body.setImmovable(true);
     sprite.itemData = item;
+    sprite._attracting = false;
 
-    s.tweens.add({
+    sprite.bobTween = s.tweens.add({
       targets: sprite,
       y: y - 5,
       duration: 650 + Math.random() * 150,
@@ -47,5 +50,25 @@ export class OreDropSystem {
         onComplete: () => { if (sprite.active) sprite.destroy(); }
       });
     });
+  }
+
+  update() {
+    const s = this.scene;
+    if (!s.player?.active) return;
+    const px = s.player.x, py = s.player.y;
+    for (const sprite of s.lootGroup.getChildren()) {
+      if (!sprite.active) continue;
+      const dx = px - sprite.x, dy = py - sprite.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (!sprite._attracting && dist < 100) {
+        sprite._attracting = true;
+        sprite.bobTween?.stop();
+        sprite.bobTween = null;
+        sprite.body.setImmovable(false);
+      }
+      if (sprite._attracting && dist > 1) {
+        sprite.body.setVelocity((dx / dist) * 160, (dy / dist) * 160);
+      }
+    }
   }
 }

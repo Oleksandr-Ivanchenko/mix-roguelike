@@ -129,7 +129,7 @@ export class ProgressionSystem {
   _upgradeWave() {
     const s        = this.scene;
     s.wave         = s.level;
-    const newDelay = Math.max(800, 2500 - s.level * 120);
+    const newDelay = Math.max(1000, 3200 - s.level * 130);
     if (newDelay !== s.spawnTimer.delay) {
       s.spawnTimer.remove();
       s.spawnTimer = s.time.addEvent({

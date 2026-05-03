@@ -75,6 +75,12 @@ export const SKILL_POOL = [
   { id: "explosive_arrow",  rarity: "epic", class: "archer", unique: true, icon: "💣", label: "Взрывные стрелы",        apply: s => { s.explosiveArrows = true; } },
   { id: "freeze_chance",    rarity: "epic", class: "archer",               icon: "❄️", label: "20% шанс заморозки",     apply: s => { s.freezeChance = (s.freezeChance || 0) + 0.20; } },
   { id: "chain_lightning",  rarity: "epic", class: "archer", unique: true, icon: "⚡", label: "Цепная молния",          apply: s => { s.chainLightning = true; } },
+  { id: "ricochet",         rarity: "epic", class: "archer", unique: true, icon: "🪃", label: "Рикошет — стрела отскакивает ×3",
+    apply: s => { s.ricochetBounces = (s.ricochetBounces || 0) + 3; } },
+
+  // ═══ RARE — только лучник (дополнительно) ══════════════════════════════════
+  { id: "arrow_split",      rarity: "rare", class: "archer", unique: true, icon: "🔀", label: "Расщепление — стрела делится на 2",
+    apply: s => { s.arrowSplit = true; } },
 
   // ═══ EPIC — оба класса ═════════════════════════════════════════════════════
   { id: "aoe_death",    rarity: "epic", unique: true, icon: "💀", label: "Взрыв при смерти врага", apply: s => { s.aoeOnDeath = true; } },
@@ -142,6 +148,16 @@ export const SYNERGIES = [
     id: "elemental_chaos", requires: ["freeze_chance", "chain_lightning"],
     label: "🌪️ Хаос стихий", desc: "+15% шанс оглушения при попадании",
     apply: s => { s.stunChance = (s.stunChance || 0) + 0.15; },
+  },
+  {
+    id: "cascade", requires: ["ricochet", "arrow_split"],
+    label: "⛓️ Каскад", desc: "Отрикошеченные стрелы тоже расщепляются",
+    apply: s => { s.cascadeRicochet = true; },
+  },
+  {
+    id: "smart_volley", requires: ["ricochet", "multishot"],
+    label: "🎯 Умный залп", desc: "Все стрелы рикошетят + +1 рикошет",
+    apply: s => { s.ricochetBounces = (s.ricochetBounces || 0) + 1; },
   },
 
   // ── Воин ──────────────────────────────────────────────────────────────────

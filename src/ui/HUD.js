@@ -116,7 +116,7 @@ export class HUD {
 
     // ── Bottom hint ──────────────────────────────────────────────────────────
     s.add.text(W / 2, H - 14, "WASD движение  [SHIFT] спринт  [SPACE] уклон  [CTRL] блок  [E] магазин  [TAB] кузница  [Q][F] навыки", {
-      fontSize: "9px", color: "#333344", fontFamily: "monospace"
+      fontSize: "9px", color: "#8899bb", fontFamily: "monospace"
     }).setOrigin(0.5).setScrollFactor(0).setDepth(22);
   }
 

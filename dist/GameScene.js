@@ -20,6 +20,7 @@ import { CLASSES } from "./config/classes.js";
 import { ORE_KEYS } from "./config/items.js";
 import { SKILL_ASSET_MAP } from "./config/craftedSkills.js";
 import { applyStatCaps } from "./utils/statCaps.js";
+import { SoundSystem } from "./systems/SoundSystem.js";
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super("GameScene"); }
@@ -73,6 +74,20 @@ export default class GameScene extends Phaser.Scene {
 
     ORE_KEYS.forEach(key => this.load.image(key, `assets/Coins/${key}.png`));
     SKILL_ASSET_MAP.forEach(([key, path]) => this.load.image(key, path));
+
+    // ── Audio ──────────────────────────────────────────────────────────────────
+    this.load.audio("sfx_arrow",     "assets/Audio/ArrowShot.mp3");
+    this.load.audio("sfx_magic",     "assets/Audio/land_soft.mp3");
+    this.load.audio("sfx_bullet",    "assets/Audio/soundBoom.mp3");
+    this.load.audio("sfx_explode",   "assets/Audio/fireSoundSkills.mp3");
+    this.load.audio("sfx_crit",      "assets/Audio/krittDamage.mp3");
+    this.load.audio("sfx_playerDie", "assets/Audio/isaacdies.mp3");
+    this.load.audio("sfx_drop",    "assets/Audio/drop.mp3");
+    this.load.audio("sfx_monAtk",  "assets/Audio/soundMonsterAtack.mp3");
+    this.load.audio("sfx_bossAtk", "assets/Audio/hellboss_groundpound_1.mp3");
+    this.load.audio("sfx_die1",    "assets/Audio/goodeath1.mp3");
+    this.load.audio("sfx_die2",    "assets/Audio/goodeath2.mp3");
+    this.load.audio("sfx_step",    "assets/Audio/zvuk_-_shagov.mp3");
   }
 
   create() {
@@ -159,7 +174,7 @@ export default class GameScene extends Phaser.Scene {
     // ── WAVE SYSTEM ────────────────────────
     this.waveNumber    = this.registry.get("waveNumber") || 1;
     this.waveKills     = 0;
-    this.killTarget    = 1000;
+    this.killTarget    = 100;
     this._waveComplete = false;
 
     // ── LUCK ───────────────────────────────
@@ -228,7 +243,18 @@ export default class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player,       this.wallGroup);
     this.physics.add.collider(this.enemies,      this.wallGroup);
     this.physics.add.collider(this.enemyBullets, this.wallGroup, (b) => b.destroy());
-    this.physics.add.collider(this.projectiles,  this.wallGroup, (proj) => proj.destroy());
+    this.physics.add.collider(this.projectiles, this.wallGroup, (proj) => {
+      if ((proj.bounces ?? 0) > 0) {
+        const vx = proj.body.velocity.x, vy = proj.body.velocity.y;
+        if (Math.abs(vx) > Math.abs(vy)) proj.body.setVelocityX(-vx);
+        else                             proj.body.setVelocityY(-vy);
+        proj.rotation = Math.atan2(proj.body.velocity.y, proj.body.velocity.x) + (proj._rotOff || 0);
+        proj.bounces--;
+        proj.setTint(0x44eeff);
+        return;
+      }
+      proj.destroy();
+    });
 
     // ── OVERLAPS ───────────────────────────
     this.physics.add.overlap(this.projectiles, this.enemies, (proj, enemy) => {
@@ -265,7 +291,12 @@ export default class GameScene extends Phaser.Scene {
 
     this.hud.build();
     this.mobileControls.build();
+    this.sfx = new SoundSystem(this);
     this.gameStartTime = this.time.now;
+
+    // ── Pause when window loses focus ──────────────────────────────────────────
+    this.game.events.on("blur",  this._onBlur,  this);
+    this.game.events.on("focus", this._onFocus, this);
 
     // ── INPUT ──────────────────────────────
     this.cursors = this.input.keyboard.createCursorKeys();
@@ -329,10 +360,10 @@ export default class GameScene extends Phaser.Scene {
     );
 
     // ── SPAWN ──────────────────────────────
-    for (let i = 0; i < 3; i++) this.enemySystem.spawn();
+    for (let i = 0; i < 2; i++) this.enemySystem.spawn();
 
     this.spawnTimer = this.time.addEvent({
-      delay: 2500,
+      delay: 3200,
       loop: true,
       callback: () => this.enemySystem.spawn()
     });
@@ -412,6 +443,40 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5, 0.5);
   }
 
+  _onBlur() {
+    if (this._gamePaused || this._waveComplete || this.levelUpOpen) return;
+    this._gamePaused = true;
+    this.physics.pause();
+    this._showPauseOverlay();
+  }
+
+  _onFocus() {
+    if (!this._gamePaused) return;
+    this._gamePaused = false;
+    this.physics.resume();
+    this._hidePauseOverlay();
+  }
+
+  _showPauseOverlay() {
+    const W = this.cameras.main.width;
+    const H = this.cameras.main.height;
+    this._pauseEl = [
+      this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.60)
+        .setScrollFactor(0).setDepth(90),
+      this.add.text(W / 2, H / 2 - 20, "ПАУЗА", {
+        fontSize: "52px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold"
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(91),
+      this.add.text(W / 2, H / 2 + 36, "Нажмите на окно, чтобы продолжить", {
+        fontSize: "15px", color: "#aaaaaa", fontFamily: "monospace"
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(91),
+    ];
+  }
+
+  _hidePauseOverlay() {
+    this._pauseEl?.forEach(el => el.destroy());
+    this._pauseEl = null;
+  }
+
   _useSkill(slot) {
     if (this.levelUpOpen || this.shopOpen || this.forgeOpen) return;
     const sk = this.activeSkillSlots?.[slot];
@@ -455,6 +520,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   update(time, delta) {
+    if (this._gamePaused) return;
     if (this.levelUpOpen || this.shopOpen || this.forgeOpen) return;
 
     const body = this.player.body;
@@ -475,14 +541,16 @@ export default class GameScene extends Phaser.Scene {
     this.isSprinting = this._shiftKey?.isDown && isMoving && !this.isExhausted;
     this.isBlocking  = cls === "warrior" && this._ctrlKey?.isDown && !this.isExhausted;
     if (this.isBlocking) this.resourceSystem.onBlock(delta / 1000);
+    this._isMoving = isMoving;
+    this.sfx.playStep(now, isMoving);
 
     // ── Движение ─────────────────────────
-    if (!this.isDashing) body.setVelocity(0);
+    if (!this.isDashing && !this._meleeLunging) body.setVelocity(0);
     const sprintMult = this.isSprinting ? (cls === "warrior" ? 1.4 : 1.35) : 1;
     const exhaustMult = this.isExhausted ? 0.7 : 1;
     const effectiveSpeed = this.moveSpeed * sprintMult * exhaustMult;
 
-    if (!this.isDashing) {
+    if (!this.isDashing && !this._meleeLunging) {
       const vx = L ? -effectiveSpeed : R ? effectiveSpeed : jdx * effectiveSpeed;
       const vy = U ? -effectiveSpeed : D ? effectiveSpeed : jdy * effectiveSpeed;
       if (vx !== 0) body.setVelocityX(vx);
@@ -561,6 +629,7 @@ export default class GameScene extends Phaser.Scene {
     // ── Системы ───────────────────────────
     this.enemySystem.update(now);
     this.orbSystem.update();
+    this.oreDropSystem.update();
   }
 
   _showWaveComplete() {

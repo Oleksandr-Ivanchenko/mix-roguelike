@@ -36,7 +36,7 @@ export class OreShopMenu {
     this._buysLeft = MAX_BUYS_PER_VISIT;
     this._rerollCost = 1;
     this._activeIdxs = this._rollUpgrades();
-    this.scene.physics.pause();
+    if (!this.scene._waveComplete) this.scene.physics.pause();
     this.scene.shopOpen = true;
     this._build();
   }
@@ -54,7 +54,7 @@ export class OreShopMenu {
   hide() {
     this.isOpen = false;
     this.scene.shopOpen = false;
-    this.scene.physics.resume();
+    if (!this.scene._waveComplete) this.scene.physics.resume();
     this._els.forEach(e => e.destroy());
     this._els = [];
   }

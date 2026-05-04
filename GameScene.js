@@ -29,9 +29,10 @@ export default class GameScene extends Phaser.Scene {
 
   preload() {
     // ── Terrain ────────────────────────────────────────────────────────────────
-    this.load.image("wall",  "assets/wall.png");
-    this.load.image("floor", "assets/floor.png");
-    this.load.image("door",  "assets/door.png");
+    this.load.image("wall",      "assets/wall.png");
+    this.load.image("floor",     "assets/floor.png");
+    this.load.image("door",      "assets/door.png");
+    this.load.image("potion_hp", "assets/Bottles/xpbot.png");
 
     // ── Heroes ─────────────────────────────────────────────────────────────────
     this.load.image("player",          "assets/player.png");
@@ -98,6 +99,10 @@ export default class GameScene extends Phaser.Scene {
     this.load.audio("sfx_die1",    "assets/Audio/goodeath1.mp3");
     this.load.audio("sfx_die2",    "assets/Audio/goodeath2.mp3");
     this.load.audio("sfx_step",    "assets/Audio/zvuk_-_shagov.mp3");
+
+    this.load.audio("music_normal1", "assets/Audio/GameMusic/Тихий Остров (1).mp3");
+    this.load.audio("music_normal2", "assets/Audio/GameMusic/Тихий Остров.mp3");
+    this.load.audio("music_boss",    "assets/Audio/GameMusic/Тихий круг боссов.mp3");
   }
 
   create() {
@@ -182,10 +187,11 @@ export default class GameScene extends Phaser.Scene {
     this.activeSynergies = new Set();
 
     // ── WAVE SYSTEM ────────────────────────
-    this.waveNumber    = this.registry.get("waveNumber") || 1;
-    this.waveKills     = 0;
-    this.killTarget    = 100;
-    this._waveComplete = false;
+    this.waveNumber       = this.registry.get("waveNumber") || 1;
+    this.waveKills        = 0;
+    this.killTarget       = 95;
+    this._waveComplete    = false;
+    this._waveBossSpawned = false;
 
     // ── LUCK ───────────────────────────────
     this.luck = 0;
@@ -284,6 +290,18 @@ export default class GameScene extends Phaser.Scene {
       if (data.type === "currency") {
         this.gold += Math.round((data.value ?? 1) * (this.goldMult || 1));
         this.hud.refreshGold(this.gold);
+      } else if (data.type === "heal") {
+        const heal = data.value ?? 25;
+        const healed = Math.min(heal, this.playerMaxHP - this.playerHP);
+        this.playerHP = Math.min(this.playerMaxHP, this.playerHP + heal);
+        this.hud.refreshHP(this.playerHP, this.playerMaxHP);
+        if (healed > 0) {
+          const t = this.add.text(this.player.x, this.player.y - 24, `+${Math.ceil(healed)} HP`, {
+            fontSize: "14px", color: "#44ff88", fontFamily: "monospace", fontStyle: "bold"
+          }).setDepth(15).setOrigin(0.5);
+          this.tweens.add({ targets: t, y: t.y - 30, alpha: 0, duration: 900,
+            onComplete: () => t.destroy() });
+        }
       } else {
         this.ores[data.key] = (this.ores[data.key] || 0) + 1;
         this.hud.refreshOres(this.ores);
@@ -302,6 +320,8 @@ export default class GameScene extends Phaser.Scene {
     this.hud.build();
     this.mobileControls.build();
     this.sfx = new SoundSystem(this);
+    this.hud.buildSoundControl(this.sfx);
+    this.sfx.startMusic(Math.random() < 0.5 ? "music_normal1" : "music_normal2");
     this.weaponUpgradeMenu = new WeaponUpgradeMenu(this);
 
     // ── Restore weapon tier across waves ──────────────────────────────────────
@@ -392,7 +412,7 @@ export default class GameScene extends Phaser.Scene {
     this.spawnTimer = this.time.addEvent({
       delay: 3200,
       loop: true,
-      callback: () => this.enemySystem.spawn()
+      callback: () => { if (!this._waveBossSpawned) this.enemySystem.spawn(); }
     });
   }
 

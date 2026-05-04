@@ -94,6 +94,25 @@ export class EnemySystem {
     }
   }
 
+  spawnWaveBoss() {
+    const s    = this.scene;
+    const diff = this._getDiff();
+    const pos  = this._spawnPos();
+    if (!pos) return;
+
+    // Wave boss: heavily buffed boss with all mutations
+    const boss = this._createEnemy(pos.ex, pos.ey, "boss", ["elite", "armored"], diff * 3);
+    if (!boss) return;
+    boss._isWaveBoss = true;
+    boss.setTint(0xffaa00);
+    const sz = boss.displayWidth * 1.6;
+    boss.setDisplaySize(sz, sz);
+    if (boss.bossLabel) {
+      boss.bossLabel.setText("☠ ВОЛНОВОЙ БОСС");
+      boss.bossLabel.setStyle({ fontSize: "13px", color: "#ffaa00", fontFamily: "monospace", fontStyle: "bold" });
+    }
+  }
+
   spawnMiniBoss() {
     const s    = this.scene;
     const diff = this._getDiff();
@@ -164,6 +183,7 @@ export class EnemySystem {
     }
 
     s.enemies.add(e);
+    return e;
   }
 
   shootFrom(e) {

@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { WEAPON_LIST, WEAPONS } from "./config/weapons.js";
 import { xpForLevel } from "./config/progression.js";
 import { MapBuilder } from "./map/MapBuilder.js";
+import { RoomSystem } from "./systems/RoomSystem.js";
 import { EffectsSystem } from "./systems/EffectsSystem.js";
 import { XpOrbSystem } from "./systems/XpOrbSystem.js";
 import { CombatSystem } from "./systems/CombatSystem.js";
@@ -119,7 +120,10 @@ export default class GameScene extends Phaser.Scene {
     this.T    = 32;
     this.mapW = 52;
     this.mapH = 30;
-    this.map  = MapBuilder.build(this.mapW, this.mapH);
+    const level = MapBuilder.buildLevel(this.mapW, this.mapH);
+    this.map = level.map;
+    this.rooms = level.rooms;
+    this.roomSystem = new RoomSystem(this, this.rooms);
 
     // ── COIN TEXTURES (generate once) ──────
     [["coin_small", 10, 0xffdd44], ["coin_large", 14, 0xffaa00]].forEach(([key, r, fill]) => {
@@ -217,7 +221,9 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // ── PLAYER ─────────────────────────────
-    const start = MapBuilder.findFreeCell(this.map, this.mapW, this.mapH);
+    // Стартовая позиция — центр стартовой комнаты
+    const startRoom = this.rooms.find(r => r.type === "start");
+    const start = startRoom ? { x: startRoom.center.x, y: startRoom.center.y } : MapBuilder.findFreeCell(this.map, this.mapW, this.mapH);
     const heroKey = cls.heroKey || "player";
     this.player = this.physics.add.sprite(
       start.x * this.T + this.T / 2,
@@ -407,17 +413,23 @@ export default class GameScene extends Phaser.Scene {
     );
 
     // ── SPAWN ──────────────────────────────
-    for (let i = 0; i < 2; i++) this.enemySystem.spawn();
-
-    this.spawnTimer = this.time.addEvent({
-      delay: 3200,
-      loop: true,
-      callback: () => { if (!this._waveBossSpawned) this.enemySystem.spawn(); }
-    });
+    // (Спавн теперь через RoomSystem по триггеру)
   }
 
   gameOver() {
+    this._gamePaused = true;
     this.physics.pause();
+    this.player.setTint(0xff0000);
+    // Остановить анимацию игрока
+    if (this.player.anims) this.player.anims.stop();
+    // Остановить анимации всех врагов
+    if (this.enemies && this.enemies.getChildren) {
+      this.enemies.getChildren().forEach(e => {
+        if (e.anims) e.anims.stop();
+      });
+    }
+    // Можно добавить аналогично для других групп (например, снарядов), если нужно
+    this.sfx.stopMusic();
 
     // Сохранить рекорд
     const elapsed   = Math.floor((this.time.now - this.gameStartTime) / 1000);
@@ -635,6 +647,11 @@ export default class GameScene extends Phaser.Scene {
       this._weaponSprite.rotation = angle + Math.PI / 4;
       // Зеркалим если лук смотрит влево
       this._weaponSprite.setFlipY(Math.cos(angle) < 0);
+    }
+
+    // ── Room triggers ────────────────────
+    if (this.roomSystem) {
+      this.roomSystem.checkRoomTriggers(this.player);
     }
 
     // ── Таймер выживания ─────────────────

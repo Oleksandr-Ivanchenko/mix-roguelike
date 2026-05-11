@@ -122,6 +122,27 @@ export class EnemySystem {
     if (pos) this._createEnemy(pos.ex, pos.ey, "boss", mutations, diff);
   }
 
+  spawnWave(center, count = 5, type) {
+    const s = this.scene;
+    const diff = this._getDiff();
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 2 + Math.random() * 2;
+      const ex = Math.floor(center.x + Math.cos(angle) * radius);
+      const ey = Math.floor(center.y + Math.sin(angle) * radius);
+      if (s.map[ey]?.[ex] !== 1) continue;
+      this._createEnemy(ex, ey, type || this._pickType(), [], diff);
+    }
+  }
+
+  spawnBoss(center) {
+    const s = this.scene;
+    const diff = this._getDiff();
+    const ex = Math.floor(center.x);
+    const ey = Math.floor(center.y);
+    this._createEnemy(ex, ey, "boss", ["elite", "armored"], diff * 3);
+  }
+
   _createEnemy(ex, ey, typeName, mutations, diff) {
     const s      = this.scene;
     const etype  = ENEMY_TYPES[typeName];

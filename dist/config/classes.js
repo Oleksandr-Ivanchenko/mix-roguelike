@@ -5,10 +5,10 @@ export const CLASSES = {
     heroKey: "hero_archer",
     weapon: "brokenbow",
     baseStats: {
-      moveSpeed: 500,
-      damageMult: 5.0,
-      critChance: 5.12,
-      critMult: 5.0
+      moveSpeed: 180,
+      damageMult: 1.0,
+      critChance: 0.12,
+      critMult: 2.0
     },
     allowedWeapons: ["brokenbow"]
   },

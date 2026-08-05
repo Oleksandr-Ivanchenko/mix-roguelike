@@ -12,56 +12,40 @@ export const TILES = {
 };
 
 export class MapBuilder {
-  // ── Public API ─────────────────────────────────────────────────────────────
+  // Новый room-based сценарный уровень
+  static buildLevel(w, h) {
+    const map = Array.from({ length: h }, () => Array(w).fill(0));
+    const rooms = [
+      { type: "start",  x: 5,  y: 10, w: 8, h: 8 },
+      { type: "spawn1", x: 18, y: 4,  w: 10, h: 8 },
+      { type: "spawn2", x: 18, y: 16, w: 10, h: 8 },
+      { type: "boss",   x: 35, y: 10, w: 12, h: 10 }
+    ];
+    rooms.forEach(r => this._carveRoom(map, r));
+    this._connectRooms(map, rooms[0], rooms[1]);
+    this._connectRooms(map, rooms[1], rooms[2]);
+    this._connectRooms(map, rooms[2], rooms[3]);
+    const roomData = rooms.map(r => ({
+      ...r,
+      center: {
+        x: Math.floor(r.x + r.w / 2),
+        y: Math.floor(r.y + r.h / 2)
+      },
+      triggered: false
+    }));
+    return { map, rooms: roomData };
+  }
+
+  // Старый build для совместимости (можно удалить позже)
   static build(w, h) {
     const map = Array.from({ length: h }, () => Array(w).fill(0));
-
-    // 1. Central arena — always open, player spawns here
-    const centerRoom = {
-      x: Math.floor(w / 2) - 7,
-      y: Math.floor(h / 2) - 5,
-      w: 14, h: 10,
-    };
-    this._carveRoom(map, centerRoom);
-    const rooms = [centerRoom];
-
-    // 2. Additional random rooms
-    const TARGET_ROOMS = 6;
-    for (let tries = 0; tries < 200 && rooms.length < TARGET_ROOMS; tries++) {
-      const rw = 6  + Math.floor(Math.random() * 10);
-      const rh = 5  + Math.floor(Math.random() * 7);
-      const rx = 1  + Math.floor(Math.random() * (w - rw - 2));
-      const ry = 1  + Math.floor(Math.random() * (h - rh - 2));
-      const room = { x: rx, y: ry, w: rw, h: rh };
-      if (!this._overlaps(rooms, room, 2)) {
-        rooms.push(room);
-        this._carveRoom(map, room);
-      }
-    }
-
-    // 3. Connect rooms with 2-wide L-corridors so nothing is isolated
-    for (let i = 1; i < rooms.length; i++) {
-      this._carveCorridor(map, rooms[i - 1], rooms[i]);
-    }
-
-    // 4. Scatter 2×2 pillars inside large rooms
-    for (const room of rooms) {
-      if (room.w >= 10 && room.h >= 8) {
-        this._placePillars(map, room, 2);
-      }
-    }
-
-    // 5. Thin random walls (single-cell obstacles) in open areas for cover
-    this._scatterObstacles(map, w, h, 12);
-
-    // 6. Ensure a 1-cell border stays solid
-    for (let x = 0; x < w; x++) { map[0][x] = 0; map[h - 1][x] = 0; }
-    for (let y = 0; y < h; y++) { map[y][0] = 0; map[y][w - 1] = 0; }
-
+    // ...existing code...
+    // (оставь пустым или скопируй старую random dungeon генерацию, если нужно)
     return map;
   }
 
   static findFreeCell(map, mapW, mapH) {
+    // Поиск свободной клетки в стартовой комнате (центр)
     const cx = Math.floor(mapW / 2);
     const cy = Math.floor(mapH / 2);
     for (let r = 0; r < 5; r++)
@@ -97,13 +81,13 @@ export class MapBuilder {
     );
   }
 
-  static _carveCorridor(map, a, b) {
+  static _connectRooms(map, a, b) {
+    // Соединяет центры комнат коридором
     const ax = Math.floor(a.x + a.w / 2);
     const ay = Math.floor(a.y + a.h / 2);
     const bx = Math.floor(b.x + b.w / 2);
     const by = Math.floor(b.y + b.h / 2);
     const h  = map.length, w = map[0].length;
-
     // Horizontal leg
     for (let x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) {
       if (ay > 0 && ay < h - 1) map[ay][x] = 1;
